@@ -23,7 +23,7 @@ import {
   updateSp
 } from "./lib/api";
 
-type TabKey = "dashboard" | "sp" | "clients" | "reports";
+type TabKey = "dashboard" | "sp" | "clients" | "reports" | "spProfile" | "clientProfile";
 
 interface CoiForm {
   name: string;
@@ -391,7 +391,16 @@ export function App() {
                         >
                           ▶
                         </button>
-                        <button type="button" onClick={() => setSelectedSpId(coi.id)}>Edit</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSpId(coi.id);
+                            setSelectedClientId(null);
+                            setActiveTab("spProfile");
+                          }}
+                        >
+                          Open Profile
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -399,31 +408,6 @@ export function App() {
               ))}
             </div>
           </section>
-
-          {selectedSp && (
-            <section className="detail-grid">
-              <form className="card form" onSubmit={saveSpDetails}>
-                <h2>Edit SP</h2>
-                <input name="name" defaultValue={selectedSp.name} required />
-                <input name="email" type="email" defaultValue={selectedSp.email} required />
-                <input name="phone" defaultValue={selectedSp.phone || ""} />
-                <input name="businessName" defaultValue={selectedSp.businessName || ""} />
-                <textarea name="notes" defaultValue={selectedSp.notes || ""} rows={4} placeholder="Notes" />
-                <div className="detail-actions">
-                  <a href={`mailto:${selectedSp.email}`}>Email</a>
-                  {selectedSp.phone && <a href={`tel:${selectedSp.phone}`}>Call</a>}
-                  <button disabled={busy} type="submit">Save SP</button>
-                </div>
-              </form>
-              <ContactPanel
-                timeline={timeline}
-                contactForm={contactForm}
-                setContactForm={setContactForm}
-                addContactEntry={addContactEntry}
-                busy={busy}
-              />
-            </section>
-          )}
         </>
       )}
 
@@ -510,7 +494,16 @@ export function App() {
                         >
                           ▶
                         </button>
-                        <button type="button" onClick={() => setSelectedClientId(client.id)}>Edit</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedClientId(client.id);
+                            setSelectedSpId(null);
+                            setActiveTab("clientProfile");
+                          }}
+                        >
+                          Open Profile
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -518,43 +511,94 @@ export function App() {
               ))}
             </div>
           </section>
-
-          {selectedClient && (
-            <section className="detail-grid">
-              <form className="card form" onSubmit={saveClientDetails}>
-                <h2>Edit Client</h2>
-                <input name="name" defaultValue={selectedClient.name} required />
-                <input name="email" type="email" defaultValue={selectedClient.email} required />
-                <input name="phone" defaultValue={selectedClient.phone || ""} />
-                <input name="businessName" defaultValue={selectedClient.businessName || ""} />
-                <input
-                  name="dealSizeDollars"
-                  type="number"
-                  step="0.01"
-                  defaultValue={(selectedClient.dealSizeCents / 100).toString()}
-                />
-                <input
-                  name="expectedCloseDate"
-                  type="date"
-                  defaultValue={selectedClient.expectedCloseDate || ""}
-                />
-                <textarea name="notes" defaultValue={selectedClient.notes || ""} rows={4} placeholder="Notes" />
-                <div className="detail-actions">
-                  <a href={`mailto:${selectedClient.email}`}>Email</a>
-                  {selectedClient.phone && <a href={`tel:${selectedClient.phone}`}>Call</a>}
-                  <button disabled={busy} type="submit">Save Client</button>
-                </div>
-              </form>
-              <ContactPanel
-                timeline={timeline}
-                contactForm={contactForm}
-                setContactForm={setContactForm}
-                addContactEntry={addContactEntry}
-                busy={busy}
-              />
-            </section>
-          )}
         </>
+      )}
+
+      {activeTab === "spProfile" && selectedSp && (
+        <section>
+          <div className="profile-head">
+            <h2>SP Profile: {selectedSp.name}</h2>
+            <button type="button" onClick={() => setActiveTab("sp")}>Back to SP Pipeline</button>
+          </div>
+          <section className="detail-grid">
+            <form className="card form" onSubmit={saveSpDetails}>
+              <h2>Edit SP</h2>
+              <input name="name" defaultValue={selectedSp.name} required />
+              <input name="email" type="email" defaultValue={selectedSp.email} required />
+              <input name="phone" defaultValue={selectedSp.phone || ""} />
+              <input name="businessName" defaultValue={selectedSp.businessName || ""} />
+              <textarea name="notes" defaultValue={selectedSp.notes || ""} rows={4} placeholder="Notes" />
+              <div className="detail-actions">
+                <a href={`mailto:${selectedSp.email}`}>Email</a>
+                {selectedSp.phone && <a href={`tel:${selectedSp.phone}`}>Call</a>}
+                <button disabled={busy} type="submit">Save SP</button>
+              </div>
+            </form>
+            <ContactPanel
+              timeline={timeline}
+              contactForm={contactForm}
+              setContactForm={setContactForm}
+              addContactEntry={addContactEntry}
+              busy={busy}
+            />
+          </section>
+        </section>
+      )}
+
+      {activeTab === "clientProfile" && selectedClient && (
+        <section>
+          <div className="profile-head">
+            <h2>Client Profile: {selectedClient.name}</h2>
+            <button type="button" onClick={() => setActiveTab("clients")}>Back to Client Pipeline</button>
+          </div>
+          <section className="detail-grid">
+            <form className="card form" onSubmit={saveClientDetails}>
+              <h2>Edit Client</h2>
+              <input name="name" defaultValue={selectedClient.name} required />
+              <input name="email" type="email" defaultValue={selectedClient.email} required />
+              <input name="phone" defaultValue={selectedClient.phone || ""} />
+              <input name="businessName" defaultValue={selectedClient.businessName || ""} />
+              <input
+                name="dealSizeDollars"
+                type="number"
+                step="0.01"
+                defaultValue={(selectedClient.dealSizeCents / 100).toString()}
+              />
+              <input
+                name="expectedCloseDate"
+                type="date"
+                defaultValue={selectedClient.expectedCloseDate || ""}
+              />
+              <textarea name="notes" defaultValue={selectedClient.notes || ""} rows={4} placeholder="Notes" />
+              <div className="detail-actions">
+                <a href={`mailto:${selectedClient.email}`}>Email</a>
+                {selectedClient.phone && <a href={`tel:${selectedClient.phone}`}>Call</a>}
+                <button disabled={busy} type="submit">Save Client</button>
+              </div>
+            </form>
+            <ContactPanel
+              timeline={timeline}
+              contactForm={contactForm}
+              setContactForm={setContactForm}
+              addContactEntry={addContactEntry}
+              busy={busy}
+            />
+          </section>
+        </section>
+      )}
+
+      {activeTab === "spProfile" && !selectedSp && (
+        <section className="card form">
+          <h2>No SP selected</h2>
+          <button type="button" onClick={() => setActiveTab("sp")}>Go to SP Pipeline</button>
+        </section>
+      )}
+
+      {activeTab === "clientProfile" && !selectedClient && (
+        <section className="card form">
+          <h2>No Client selected</h2>
+          <button type="button" onClick={() => setActiveTab("clients")}>Go to Client Pipeline</button>
+        </section>
       )}
 
       {activeTab === "reports" && (
