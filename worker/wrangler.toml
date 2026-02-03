@@ -6,5 +6,5 @@ account_id = "68d196cabbf20d791e80e7685745df1a"
 [[d1_databases]]
 binding = "DB"
 database_name = "legal_leads_crm"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "9df24e14-0d05-49af-b8fe-c6901a12853a"
 migrations_dir = "migrations"
