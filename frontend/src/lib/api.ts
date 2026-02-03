@@ -9,7 +9,9 @@ import type {
   StageChangeRequest
 } from "@legal-leads/shared/types";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "https://crm.zane-68d.workers.dev"
+).replace(/\/$/, "");
 
 function apiUrl(path: string): string {
   if (!API_BASE_URL) {
