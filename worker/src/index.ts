@@ -20,10 +20,16 @@ export interface Env {
   DB: D1Database;
 }
 
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+  "access-control-allow-headers": "content-type"
+};
+
 const json = (data: unknown, status = 200): Response =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: { "content-type": "application/json", ...CORS_HEADERS }
   });
 
 export default {
@@ -31,6 +37,10 @@ export default {
     const url = new URL(request.url);
 
     try {
+      if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
+      }
+
       if (request.method === "GET" && url.pathname === "/api/health") {
         return json({ ok: true });
       }

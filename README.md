@@ -29,6 +29,13 @@ Stack:
 6. Start frontend
    - `npm run dev:frontend`
 
+## Cloudflare Pages + Worker wiring
+- In Pages, set project root to `frontend`.
+- Add environment variable in Pages (Production and Preview):
+  - `VITE_API_BASE_URL=https://crm.<your-subdomain>.workers.dev`
+- Redeploy Pages after adding the variable.
+- Without this, `/api/*` on Pages can return `405` because Pages is not your API worker.
+
 ## Available APIs
 - `GET /api/health`
 - `GET /api/stages`
