@@ -1,6 +1,7 @@
-name = "legal-leads-crm-api"
+name = "crm"
 main = "src/index.ts"
 compatibility_date = "2026-02-03"
+account_id = "68d196cabbf20d791e80e7685745df1a"
 
 [[d1_databases]]
 binding = "DB"
