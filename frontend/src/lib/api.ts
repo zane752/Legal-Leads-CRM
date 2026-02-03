@@ -3,11 +3,15 @@ import type {
   ClientStage,
   Coi,
   CoiStage,
+  CreateEmailActivityRequest,
   CreateClientRequest,
   CreateCoiRequest,
   DashboardReport,
+  EmailActivity,
   PipelineSummary,
-  StageChangeRequest
+  StageChangeRequest,
+  UpdateClientRequest,
+  UpdateCoiRequest
 } from "@legal-leads/shared/types";
 
 const API_BASE_URL = (
@@ -85,6 +89,16 @@ export async function moveCoiStage(id: string, toStage: CoiStage, reason?: strin
   );
 }
 
+export async function updateSp(id: string, payload: UpdateCoiRequest): Promise<Coi> {
+  return unwrap<Coi>(
+    await fetch(apiUrl(`/api/cois/${id}`), {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
 export async function getClients(): Promise<Client[]> {
   return unwrap<Client[]>(await fetch(apiUrl("/api/clients")));
 }
@@ -103,6 +117,34 @@ export async function moveClientStage(id: string, toStage: ClientStage, reason?:
   const payload: StageChangeRequest<ClientStage> = { toStage, reason };
   return unwrap<Client>(
     await fetch(apiUrl(`/api/clients/${id}/stage`), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function updateClientDetails(id: string, payload: UpdateClientRequest): Promise<Client> {
+  return unwrap<Client>(
+    await fetch(apiUrl(`/api/clients/${id}`), {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+  );
+}
+
+export async function getEntityEmails(entity: "cois" | "clients", id: string): Promise<EmailActivity[]> {
+  return unwrap<EmailActivity[]>(await fetch(apiUrl(`/api/${entity}/${id}/emails`)));
+}
+
+export async function createEntityEmail(
+  entity: "cois" | "clients",
+  id: string,
+  payload: CreateEmailActivityRequest
+): Promise<EmailActivity> {
+  return unwrap<EmailActivity>(
+    await fetch(apiUrl(`/api/${entity}/${id}/emails`), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)

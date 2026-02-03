@@ -1,23 +1,26 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
   CLIENT_STAGES,
   COI_STAGES,
   type Client,
-  type ClientStage,
   type Coi,
-  type CoiStage,
   type DashboardReport,
+  type EmailActivity,
   type PipelineSummary
 } from "@legal-leads/shared/types";
 import {
   createClient,
   createCoi,
+  createEntityEmail,
   getClients,
   getCois,
   getDashboardReport,
+  getEntityEmails,
   getPipelineSummary,
   moveClientStage,
-  moveCoiStage
+  moveCoiStage,
+  updateClientDetails,
+  updateSp
 } from "./lib/api";
 
 type TabKey = "dashboard" | "sp" | "clients" | "reports";
@@ -39,6 +42,13 @@ interface ClientForm {
   coiId: string;
 }
 
+interface ContactForm {
+  direction: "INBOUND" | "OUTBOUND";
+  subject: string;
+  snippet: string;
+  sentAt: string;
+}
+
 const emptyCoiForm: CoiForm = { name: "", email: "", phone: "", businessName: "" };
 const emptyClientForm: ClientForm = {
   name: "",
@@ -58,8 +68,23 @@ export function App() {
   const [coiForm, setCoiForm] = useState<CoiForm>(emptyCoiForm);
   const [clientForm, setClientForm] = useState<ClientForm>(emptyClientForm);
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
+  const [selectedSpId, setSelectedSpId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<EmailActivity[]>([]);
+  const [contactForm, setContactForm] = useState<ContactForm>({
+    direction: "OUTBOUND",
+    subject: "",
+    snippet: "",
+    sentAt: toLocalDatetimeValue(new Date())
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const selectedSp = useMemo(() => cois.find((row) => row.id === selectedSpId) ?? null, [cois, selectedSpId]);
+  const selectedClient = useMemo(
+    () => clients.find((row) => row.id === selectedClientId) ?? null,
+    [clients, selectedClientId]
+  );
 
   const coisByStage = useMemo(() => groupByStage(cois, COI_STAGES), [cois]);
   const clientsByStage = useMemo(() => groupByStage(clients, CLIENT_STAGES), [clients]);
@@ -67,6 +92,10 @@ export function App() {
   useEffect(() => {
     void refreshData();
   }, []);
+
+  useEffect(() => {
+    void loadTimeline();
+  }, [selectedSpId, selectedClientId]);
 
   async function refreshData() {
     setError(null);
@@ -83,6 +112,22 @@ export function App() {
       setClients(nextClients);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to refresh");
+    }
+  }
+
+  async function loadTimeline() {
+    try {
+      if (selectedSpId) {
+        setTimeline(await getEntityEmails("cois", selectedSpId));
+        return;
+      }
+      if (selectedClientId) {
+        setTimeline(await getEntityEmails("clients", selectedClientId));
+        return;
+      }
+      setTimeline([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load contact timeline");
     }
   }
 
@@ -159,6 +204,90 @@ export function App() {
       await refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to move stage");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSpDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedSp) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const formData = new FormData(event.currentTarget);
+    try {
+      await updateSp(selectedSp.id, {
+        name: String(formData.get("name") || ""),
+        email: String(formData.get("email") || ""),
+        phone: String(formData.get("phone") || ""),
+        businessName: String(formData.get("businessName") || ""),
+        notes: String(formData.get("notes") || "")
+      });
+      await refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save SP details");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveClientDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedClient) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const formData = new FormData(event.currentTarget);
+    const dollars = Number(formData.get("dealSizeDollars") || 0);
+    try {
+      await updateClientDetails(selectedClient.id, {
+        name: String(formData.get("name") || ""),
+        email: String(formData.get("email") || ""),
+        phone: String(formData.get("phone") || ""),
+        businessName: String(formData.get("businessName") || ""),
+        notes: String(formData.get("notes") || ""),
+        dealSizeCents: Math.max(0, Math.round(dollars * 100)),
+        expectedCloseDate: String(formData.get("expectedCloseDate") || "") || undefined
+      });
+      await refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save Client details");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addContactEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const entity = selectedSpId ? "cois" : selectedClientId ? "clients" : null;
+    const id = selectedSpId ?? selectedClientId;
+    if (!entity || !id) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await createEntityEmail(entity, id, {
+        direction: contactForm.direction,
+        subject: contactForm.subject,
+        snippet: contactForm.snippet,
+        sentAt: new Date(contactForm.sentAt).toISOString(),
+        fromEmail: entity === "cois" ? selectedSp?.email : selectedClient?.email,
+        toEmail: entity === "cois" ? selectedSp?.email : selectedClient?.email
+      });
+      setContactForm({
+        direction: "OUTBOUND",
+        subject: "",
+        snippet: "",
+        sentAt: toLocalDatetimeValue(new Date())
+      });
+      await refreshData();
+      await loadTimeline();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add contact entry");
     } finally {
       setBusy(false);
     }
@@ -262,6 +391,7 @@ export function App() {
                         >
                           ▶
                         </button>
+                        <button type="button" onClick={() => setSelectedSpId(coi.id)}>Edit</button>
                       </div>
                     </article>
                   ))}
@@ -269,6 +399,31 @@ export function App() {
               ))}
             </div>
           </section>
+
+          {selectedSp && (
+            <section className="detail-grid">
+              <form className="card form" onSubmit={saveSpDetails}>
+                <h2>Edit SP</h2>
+                <input name="name" defaultValue={selectedSp.name} required />
+                <input name="email" type="email" defaultValue={selectedSp.email} required />
+                <input name="phone" defaultValue={selectedSp.phone || ""} />
+                <input name="businessName" defaultValue={selectedSp.businessName || ""} />
+                <textarea name="notes" defaultValue={selectedSp.notes || ""} rows={4} placeholder="Notes" />
+                <div className="detail-actions">
+                  <a href={`mailto:${selectedSp.email}`}>Email</a>
+                  {selectedSp.phone && <a href={`tel:${selectedSp.phone}`}>Call</a>}
+                  <button disabled={busy} type="submit">Save SP</button>
+                </div>
+              </form>
+              <ContactPanel
+                timeline={timeline}
+                contactForm={contactForm}
+                setContactForm={setContactForm}
+                addContactEntry={addContactEntry}
+                busy={busy}
+              />
+            </section>
+          )}
         </>
       )}
 
@@ -348,18 +503,14 @@ export function App() {
                       <span>{client.email}</span>
                       <span>${(client.dealSizeCents / 100).toLocaleString()}</span>
                       <div className="actions">
-                        <button
-                          disabled={busy || stage === CLIENT_STAGES[0]}
-                          onClick={() => moveClient(client, "prev")}
-                        >
-                          ◀
-                        </button>
+                        <button disabled={busy || stage === CLIENT_STAGES[0]} onClick={() => moveClient(client, "prev")}>◀</button>
                         <button
                           disabled={busy || stage === CLIENT_STAGES[CLIENT_STAGES.length - 1]}
                           onClick={() => moveClient(client, "next")}
                         >
                           ▶
                         </button>
+                        <button type="button" onClick={() => setSelectedClientId(client.id)}>Edit</button>
                       </div>
                     </article>
                   ))}
@@ -367,6 +518,42 @@ export function App() {
               ))}
             </div>
           </section>
+
+          {selectedClient && (
+            <section className="detail-grid">
+              <form className="card form" onSubmit={saveClientDetails}>
+                <h2>Edit Client</h2>
+                <input name="name" defaultValue={selectedClient.name} required />
+                <input name="email" type="email" defaultValue={selectedClient.email} required />
+                <input name="phone" defaultValue={selectedClient.phone || ""} />
+                <input name="businessName" defaultValue={selectedClient.businessName || ""} />
+                <input
+                  name="dealSizeDollars"
+                  type="number"
+                  step="0.01"
+                  defaultValue={(selectedClient.dealSizeCents / 100).toString()}
+                />
+                <input
+                  name="expectedCloseDate"
+                  type="date"
+                  defaultValue={selectedClient.expectedCloseDate || ""}
+                />
+                <textarea name="notes" defaultValue={selectedClient.notes || ""} rows={4} placeholder="Notes" />
+                <div className="detail-actions">
+                  <a href={`mailto:${selectedClient.email}`}>Email</a>
+                  {selectedClient.phone && <a href={`tel:${selectedClient.phone}`}>Call</a>}
+                  <button disabled={busy} type="submit">Save Client</button>
+                </div>
+              </form>
+              <ContactPanel
+                timeline={timeline}
+                contactForm={contactForm}
+                setContactForm={setContactForm}
+                addContactEntry={addContactEntry}
+                busy={busy}
+              />
+            </section>
+          )}
         </>
       )}
 
@@ -391,6 +578,66 @@ export function App() {
         </section>
       )}
     </main>
+  );
+}
+
+function ContactPanel({
+  timeline,
+  contactForm,
+  setContactForm,
+  addContactEntry,
+  busy
+}: {
+  timeline: EmailActivity[];
+  contactForm: ContactForm;
+  setContactForm: Dispatch<SetStateAction<ContactForm>>;
+  addContactEntry: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  busy: boolean;
+}) {
+  return (
+    <section className="card form">
+      <h2>Contact Log</h2>
+      <form className="form" onSubmit={addContactEntry}>
+        <select
+          value={contactForm.direction}
+          onChange={(event) =>
+            setContactForm((v) => ({ ...v, direction: event.target.value as ContactForm["direction"] }))
+          }
+        >
+          <option value="OUTBOUND">Outbound</option>
+          <option value="INBOUND">Inbound</option>
+        </select>
+        <input
+          placeholder="Subject"
+          value={contactForm.subject}
+          onChange={(event) => setContactForm((v) => ({ ...v, subject: event.target.value }))}
+        />
+        <textarea
+          rows={3}
+          placeholder="Contact notes"
+          value={contactForm.snippet}
+          onChange={(event) => setContactForm((v) => ({ ...v, snippet: event.target.value }))}
+        />
+        <input
+          type="datetime-local"
+          value={contactForm.sentAt}
+          onChange={(event) => setContactForm((v) => ({ ...v, sentAt: event.target.value }))}
+        />
+        <button disabled={busy} type="submit">Add Contact Entry</button>
+      </form>
+
+      <div className="timeline">
+        {timeline.length === 0 && <p>No contact entries yet.</p>}
+        {timeline.map((entry) => (
+          <article className="timeline-item" key={entry.id}>
+            <strong>{entry.direction === "OUTBOUND" ? "Sent" : "Received"}</strong>
+            <span>{entry.subject || "No subject"}</span>
+            <small>{new Date(entry.sentAt).toLocaleString()}</small>
+            {entry.snippet && <p>{entry.snippet}</p>}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -447,4 +694,9 @@ function stageLabel(value: string): string {
     .split("_")
     .map((word) => word[0] + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+function toLocalDatetimeValue(date: Date): string {
+  const pad = (v: number) => String(v).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
