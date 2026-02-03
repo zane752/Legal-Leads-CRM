@@ -50,56 +50,56 @@ export default {
       }
 
       if (request.method === "GET" && url.pathname === "/api/reports/summary") {
-        return getSummary(env.DB);
+        return await getSummary(env.DB);
       }
 
       if (request.method === "GET" && url.pathname === "/api/cois") {
-        return listCois(env.DB, url);
+        return await listCois(env.DB, url);
       }
 
       if (request.method === "POST" && url.pathname === "/api/cois") {
-        return createCoi(env.DB, request);
+        return await createCoi(env.DB, request);
       }
 
       if (request.method === "GET" && url.pathname === "/api/clients") {
-        return listClients(env.DB, url);
+        return await listClients(env.DB, url);
       }
 
       if (request.method === "POST" && url.pathname === "/api/clients") {
-        return createClient(env.DB, request);
+        return await createClient(env.DB, request);
       }
 
       if (request.method === "GET" && url.pathname === "/api/referrals") {
-        return listReferrals(env.DB, url);
+        return await listReferrals(env.DB, url);
       }
 
       const coiById = matchPath(url.pathname, /^\/api\/cois\/([^/]+)$/);
       if (coiById && request.method === "PATCH") {
-        return updateCoi(env.DB, coiById[1], request);
+        return await updateCoi(env.DB, coiById[1], request);
       }
 
       const coiStage = matchPath(url.pathname, /^\/api\/cois\/([^/]+)\/stage$/);
       if (coiStage && request.method === "POST") {
-        return changeCoiStage(env.DB, coiStage[1], request);
+        return await changeCoiStage(env.DB, coiStage[1], request);
       }
 
       const clientById = matchPath(url.pathname, /^\/api\/clients\/([^/]+)$/);
       if (clientById && request.method === "PATCH") {
-        return updateClient(env.DB, clientById[1], request);
+        return await updateClient(env.DB, clientById[1], request);
       }
 
       const clientStage = matchPath(url.pathname, /^\/api\/clients\/([^/]+)\/stage$/);
       if (clientStage && request.method === "POST") {
-        return changeClientStage(env.DB, clientStage[1], request);
+        return await changeClientStage(env.DB, clientStage[1], request);
       }
 
       const emailsPath = matchPath(url.pathname, /^\/api\/(cois|clients)\/([^/]+)\/emails$/);
       if (emailsPath && request.method === "GET") {
-        return listEmails(env.DB, emailsPath[1], emailsPath[2]);
+        return await listEmails(env.DB, emailsPath[1], emailsPath[2]);
       }
 
       if (emailsPath && request.method === "POST") {
-        return createEmail(env.DB, emailsPath[1], emailsPath[2], request);
+        return await createEmail(env.DB, emailsPath[1], emailsPath[2], request);
       }
 
       return json({ error: "Not found" }, 404);
