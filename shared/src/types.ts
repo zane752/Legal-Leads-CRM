@@ -1,0 +1,130 @@
+export const COI_STAGES = [
+  "NEW_CONTACT",
+  "INTRO",
+  "RESCHEDULED",
+  "ATTORNEY_MEETING",
+  "DOC_SUBMISSION",
+  "DOC_SIGNED",
+  "REFERRING"
+] as const;
+
+export const CLIENT_STAGES = [
+  "NEW_CONTACT",
+  "INTRO",
+  "DOC_PROPOSAL",
+  "FINALIZED",
+  "INVOICE_PENDING",
+  "PAID_CLOSED"
+] as const;
+
+export type CoiStage = (typeof COI_STAGES)[number];
+export type ClientStage = (typeof CLIENT_STAGES)[number];
+
+export interface PipelineSummary {
+  coiCount: number;
+  clientCount: number;
+  openClientValueCents: number;
+}
+
+export interface Coi {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  businessName: string | null;
+  stage: CoiStage;
+  notes: string | null;
+  lastContactAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  businessName: string | null;
+  stage: ClientStage;
+  dealSizeCents: number;
+  expectedCloseDate: string | null;
+  notes: string | null;
+  lastContactAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Referral {
+  id: string;
+  coiId: string;
+  clientId: string;
+  referredAt: string;
+  status: "ACTIVE" | "ARCHIVED";
+}
+
+export interface StageChangeRequest<TStage extends string> {
+  toStage: TStage;
+  reason?: string;
+  changedByUserId?: string;
+}
+
+export interface CreateCoiRequest {
+  name: string;
+  email: string;
+  phone?: string;
+  businessName?: string;
+  notes?: string;
+}
+
+export interface UpdateCoiRequest {
+  name?: string;
+  email?: string;
+  phone?: string;
+  businessName?: string;
+  notes?: string;
+}
+
+export interface CreateClientRequest {
+  name: string;
+  email: string;
+  phone?: string;
+  businessName?: string;
+  notes?: string;
+  dealSizeCents?: number;
+  expectedCloseDate?: string;
+  coiId: string;
+}
+
+export interface UpdateClientRequest {
+  name?: string;
+  email?: string;
+  phone?: string;
+  businessName?: string;
+  notes?: string;
+  dealSizeCents?: number;
+  expectedCloseDate?: string;
+}
+
+export interface EmailActivity {
+  id: string;
+  entityType: "COI" | "CLIENT";
+  entityId: string;
+  direction: "INBOUND" | "OUTBOUND";
+  subject: string | null;
+  fromEmail: string | null;
+  toEmail: string | null;
+  sentAt: string;
+  threadId: string | null;
+  snippet: string | null;
+  createdAt: string;
+}
+
+export interface CreateEmailActivityRequest {
+  direction: "INBOUND" | "OUTBOUND";
+  subject?: string;
+  fromEmail?: string;
+  toEmail?: string;
+  sentAt: string;
+  threadId?: string;
+  snippet?: string;
+}
