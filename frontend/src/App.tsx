@@ -6,6 +6,7 @@ import {
   type ClientStage,
   type Coi,
   type CoiStage,
+  type DashboardReport,
   type PipelineSummary
 } from "@legal-leads/shared/types";
 import {
@@ -13,10 +14,13 @@ import {
   createCoi,
   getClients,
   getCois,
+  getDashboardReport,
   getPipelineSummary,
   moveClientStage,
   moveCoiStage
 } from "./lib/api";
+
+type TabKey = "dashboard" | "sp" | "clients" | "reports";
 
 interface CoiForm {
   name: string;
@@ -48,10 +52,12 @@ const emptyClientForm: ClientForm = {
 
 export function App() {
   const [summary, setSummary] = useState<PipelineSummary | null>(null);
+  const [dashboardReport, setDashboardReport] = useState<DashboardReport | null>(null);
   const [cois, setCois] = useState<Coi[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [coiForm, setCoiForm] = useState<CoiForm>(emptyCoiForm);
   const [clientForm, setClientForm] = useState<ClientForm>(emptyClientForm);
+  const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,12 +71,14 @@ export function App() {
   async function refreshData() {
     setError(null);
     try {
-      const [nextSummary, nextCois, nextClients] = await Promise.all([
+      const [nextSummary, nextReport, nextCois, nextClients] = await Promise.all([
         getPipelineSummary(),
+        getDashboardReport(),
         getCois(),
         getClients()
       ]);
       setSummary(nextSummary);
+      setDashboardReport(nextReport);
       setCois(nextCois);
       setClients(nextClients);
     } catch (err) {
@@ -78,7 +86,7 @@ export function App() {
     }
   }
 
-  async function onCreateCoi(event: FormEvent) {
+  async function onCreateSp(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError(null);
@@ -87,7 +95,7 @@ export function App() {
       setCoiForm(emptyCoiForm);
       await refreshData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create COI");
+      setError(err instanceof Error ? err.message : "Failed to create SP");
     } finally {
       setBusy(false);
     }
@@ -116,7 +124,7 @@ export function App() {
     }
   }
 
-  async function moveCoi(item: Coi, dir: "prev" | "next") {
+  async function moveSp(item: Coi, dir: "prev" | "next") {
     const idx = COI_STAGES.indexOf(item.stage);
     const nextIdx = dir === "next" ? idx + 1 : idx - 1;
     if (nextIdx < 0 || nextIdx >= COI_STAGES.length) {
@@ -160,169 +168,267 @@ export function App() {
     <main className="page">
       <header className="hero">
         <h1>Legal Leads CRM</h1>
-        <p>Pipeline 1 (COIs) + Pipeline 2 (Clients), linked by referral source.</p>
+        <p>Pipeline 1 (SPs) + Pipeline 2 (Clients), linked by referral source.</p>
         {summary && (
           <div className="metrics">
-            <span>COIs: {summary.coiCount}</span>
+            <span>SPs: {summary.coiCount}</span>
             <span>Clients: {summary.clientCount}</span>
-            <span>Open Value: ${(summary.openClientValueCents / 100).toLocaleString()}</span>
           </div>
         )}
       </header>
 
+      <nav className="tabs">
+        {[
+          ["dashboard", "Dashboard"],
+          ["sp", "SP Pipeline"],
+          ["clients", "Client Pipeline"],
+          ["reports", "Reports"]
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={`tab ${activeTab === key ? "tab-active" : ""}`}
+            onClick={() => setActiveTab(key as TabKey)}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
       {error && <p className="error">{error}</p>}
 
-      <section className="forms">
-        <form className="card form" onSubmit={onCreateCoi}>
-          <h2>New COI</h2>
-          <input
-            required
-            placeholder="Name"
-            value={coiForm.name}
-            onChange={(event) => setCoiForm((v) => ({ ...v, name: event.target.value }))}
+      {activeTab === "dashboard" && (
+        <section>
+          <h2>Expected Income by Month</h2>
+          <p className="pipeline-metric">Income estimate uses 6.325% of each client deal size.</p>
+          <BarChart
+            labels={dashboardReport?.incomeByMonth.map((entry) => monthLabel(entry.month)) ?? []}
+            values={dashboardReport?.incomeByMonth.map((entry) => entry.expectedIncomeCents / 100) ?? []}
+            format={(value) => `$${Math.round(value).toLocaleString()}`}
           />
-          <input
-            required
-            placeholder="Email"
-            type="email"
-            value={coiForm.email}
-            onChange={(event) => setCoiForm((v) => ({ ...v, email: event.target.value }))}
-          />
-          <input
-            placeholder="Phone"
-            value={coiForm.phone}
-            onChange={(event) => setCoiForm((v) => ({ ...v, phone: event.target.value }))}
-          />
-          <input
-            placeholder="Business Name"
-            value={coiForm.businessName}
-            onChange={(event) => setCoiForm((v) => ({ ...v, businessName: event.target.value }))}
-          />
-          <button disabled={busy} type="submit">
-            Create COI
-          </button>
-        </form>
+        </section>
+      )}
 
-        <form className="card form" onSubmit={onCreateClient}>
-          <h2>New Client (from COI)</h2>
-          <select
-            required
-            value={clientForm.coiId}
-            onChange={(event) => setClientForm((v) => ({ ...v, coiId: event.target.value }))}
-          >
-            <option value="">Select referral COI</option>
-            {cois.map((coi) => (
-              <option key={coi.id} value={coi.id}>
-                {coi.name} ({coi.businessName || "No business"})
-              </option>
-            ))}
-          </select>
-          <input
-            required
-            placeholder="Name"
-            value={clientForm.name}
-            onChange={(event) => setClientForm((v) => ({ ...v, name: event.target.value }))}
-          />
-          <input
-            required
-            placeholder="Email"
-            type="email"
-            value={clientForm.email}
-            onChange={(event) => setClientForm((v) => ({ ...v, email: event.target.value }))}
-          />
-          <input
-            placeholder="Phone"
-            value={clientForm.phone}
-            onChange={(event) => setClientForm((v) => ({ ...v, phone: event.target.value }))}
-          />
-          <input
-            placeholder="Business Name"
-            value={clientForm.businessName}
-            onChange={(event) => setClientForm((v) => ({ ...v, businessName: event.target.value }))}
-          />
-          <input
-            placeholder="Deal Size ($)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={clientForm.dealSizeDollars}
-            onChange={(event) => setClientForm((v) => ({ ...v, dealSizeDollars: event.target.value }))}
-          />
-          <input
-            placeholder="Expected Close Date"
-            type="date"
-            value={clientForm.expectedCloseDate}
-            onChange={(event) => setClientForm((v) => ({ ...v, expectedCloseDate: event.target.value }))}
-          />
-          <button disabled={busy} type="submit">
-            Create Client
-          </button>
-        </form>
-      </section>
+      {activeTab === "sp" && (
+        <>
+          <section className="forms">
+            <form className="card form" onSubmit={onCreateSp}>
+              <h2>New SP</h2>
+              <input
+                required
+                placeholder="Name"
+                value={coiForm.name}
+                onChange={(event) => setCoiForm((v) => ({ ...v, name: event.target.value }))}
+              />
+              <input
+                required
+                placeholder="Email"
+                type="email"
+                value={coiForm.email}
+                onChange={(event) => setCoiForm((v) => ({ ...v, email: event.target.value }))}
+              />
+              <input
+                placeholder="Phone"
+                value={coiForm.phone}
+                onChange={(event) => setCoiForm((v) => ({ ...v, phone: event.target.value }))}
+              />
+              <input
+                placeholder="Business Name"
+                value={coiForm.businessName}
+                onChange={(event) => setCoiForm((v) => ({ ...v, businessName: event.target.value }))}
+              />
+              <button disabled={busy} type="submit">
+                Create SP
+              </button>
+            </form>
+          </section>
 
-      <section>
-        <h2>Pipeline 1: COIs</h2>
-        <div className="board">
-          {COI_STAGES.map((stage) => (
-            <div key={stage} className="lane">
-              <h3>{stageLabel(stage)}</h3>
-              {coisByStage[stage].map((coi) => (
-                <article className="item" key={coi.id}>
-                  <strong>{coi.name}</strong>
-                  <span>{coi.businessName || "No business"}</span>
-                  <span>{coi.email}</span>
-                  <div className="actions">
-                    <button disabled={busy || stage === COI_STAGES[0]} onClick={() => moveCoi(coi, "prev")}>
-                      ◀
-                    </button>
-                    <button
-                      disabled={busy || stage === COI_STAGES[COI_STAGES.length - 1]}
-                      onClick={() => moveCoi(coi, "next")}
-                    >
-                      ▶
-                    </button>
-                  </div>
-                </article>
+          <section>
+            <h2>Pipeline 1: SPs</h2>
+            <div className="board">
+              {COI_STAGES.map((stage) => (
+                <div key={stage} className="lane">
+                  <h3>{stageLabel(stage)}</h3>
+                  {coisByStage[stage].map((coi) => (
+                    <article className="item" key={coi.id}>
+                      <strong>{coi.name}</strong>
+                      <span>{coi.businessName || "No business"}</span>
+                      <span>{coi.email}</span>
+                      <div className="actions">
+                        <button disabled={busy || stage === COI_STAGES[0]} onClick={() => moveSp(coi, "prev")}>◀</button>
+                        <button
+                          disabled={busy || stage === COI_STAGES[COI_STAGES.length - 1]}
+                          onClick={() => moveSp(coi, "next")}
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        </>
+      )}
 
-      <section>
-        <h2>Pipeline 2: Clients</h2>
-        <div className="board">
-          {CLIENT_STAGES.map((stage) => (
-            <div key={stage} className="lane">
-              <h3>{stageLabel(stage)}</h3>
-              {clientsByStage[stage].map((client) => (
-                <article className="item" key={client.id}>
-                  <strong>{client.name}</strong>
-                  <span>{client.businessName || "No business"}</span>
-                  <span>{client.email}</span>
-                  <span>${(client.dealSizeCents / 100).toLocaleString()}</span>
-                  <div className="actions">
-                    <button
-                      disabled={busy || stage === CLIENT_STAGES[0]}
-                      onClick={() => moveClient(client, "prev")}
-                    >
-                      ◀
-                    </button>
-                    <button
-                      disabled={busy || stage === CLIENT_STAGES[CLIENT_STAGES.length - 1]}
-                      onClick={() => moveClient(client, "next")}
-                    >
-                      ▶
-                    </button>
-                  </div>
-                </article>
+      {activeTab === "clients" && (
+        <>
+          <section className="forms">
+            <form className="card form" onSubmit={onCreateClient}>
+              <h2>New Client (from SP)</h2>
+              <select
+                required
+                value={clientForm.coiId}
+                onChange={(event) => setClientForm((v) => ({ ...v, coiId: event.target.value }))}
+              >
+                <option value="">Select referral SP</option>
+                {cois.map((coi) => (
+                  <option key={coi.id} value={coi.id}>
+                    {coi.name} ({coi.businessName || "No business"})
+                  </option>
+                ))}
+              </select>
+              <input
+                required
+                placeholder="Name"
+                value={clientForm.name}
+                onChange={(event) => setClientForm((v) => ({ ...v, name: event.target.value }))}
+              />
+              <input
+                required
+                placeholder="Email"
+                type="email"
+                value={clientForm.email}
+                onChange={(event) => setClientForm((v) => ({ ...v, email: event.target.value }))}
+              />
+              <input
+                placeholder="Phone"
+                value={clientForm.phone}
+                onChange={(event) => setClientForm((v) => ({ ...v, phone: event.target.value }))}
+              />
+              <input
+                placeholder="Business Name"
+                value={clientForm.businessName}
+                onChange={(event) => setClientForm((v) => ({ ...v, businessName: event.target.value }))}
+              />
+              <input
+                placeholder="Deal Size ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={clientForm.dealSizeDollars}
+                onChange={(event) => setClientForm((v) => ({ ...v, dealSizeDollars: event.target.value }))}
+              />
+              <input
+                placeholder="Expected Close Date"
+                type="date"
+                value={clientForm.expectedCloseDate}
+                onChange={(event) => setClientForm((v) => ({ ...v, expectedCloseDate: event.target.value }))}
+              />
+              <button disabled={busy} type="submit">
+                Create Client
+              </button>
+            </form>
+          </section>
+
+          <section>
+            <h2>Pipeline 2: Clients</h2>
+            {summary && (
+              <p className="pipeline-metric">Open Value: ${(summary.openClientValueCents / 100).toLocaleString()}</p>
+            )}
+            <div className="board">
+              {CLIENT_STAGES.map((stage) => (
+                <div key={stage} className="lane">
+                  <h3>{stageLabel(stage)}</h3>
+                  {clientsByStage[stage].map((client) => (
+                    <article className="item" key={client.id}>
+                      <strong>{client.name}</strong>
+                      <span>{client.businessName || "No business"}</span>
+                      <span>{client.email}</span>
+                      <span>${(client.dealSizeCents / 100).toLocaleString()}</span>
+                      <div className="actions">
+                        <button
+                          disabled={busy || stage === CLIENT_STAGES[0]}
+                          onClick={() => moveClient(client, "prev")}
+                        >
+                          ◀
+                        </button>
+                        <button
+                          disabled={busy || stage === CLIENT_STAGES[CLIENT_STAGES.length - 1]}
+                          onClick={() => moveClient(client, "next")}
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        </>
+      )}
+
+      {activeTab === "reports" && (
+        <section className="report-grid">
+          <article className="card report-card">
+            <h2>Weekly SPs Signed (This Month)</h2>
+            <BarChart
+              labels={dashboardReport?.weekly.map((entry) => entry.weekLabel) ?? []}
+              values={dashboardReport?.weekly.map((entry) => entry.spSignedCount) ?? []}
+              format={(value) => `${Math.round(value)}`}
+            />
+          </article>
+          <article className="card report-card">
+            <h2>Weekly Clients Added (This Month)</h2>
+            <BarChart
+              labels={dashboardReport?.weekly.map((entry) => entry.weekLabel) ?? []}
+              values={dashboardReport?.weekly.map((entry) => entry.clientsAddedCount) ?? []}
+              format={(value) => `${Math.round(value)}`}
+            />
+          </article>
+        </section>
+      )}
     </main>
   );
+}
+
+function BarChart({
+  labels,
+  values,
+  format
+}: {
+  labels: string[];
+  values: number[];
+  format: (value: number) => string;
+}) {
+  const max = Math.max(...values, 1);
+
+  return (
+    <div className="chart">
+      {labels.map((label, index) => {
+        const value = values[index] ?? 0;
+        const height = Math.max(10, Math.round((value / max) * 120));
+        return (
+          <div key={label} className="chart-bar-wrap">
+            <span className="chart-value">{format(value)}</span>
+            <div className="chart-bar" style={{ height: `${height}px` }} />
+            <span className="chart-label">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function monthLabel(value: string): string {
+  const [year, month] = value.split("-").map((part) => Number(part));
+  if (!year || !month) {
+    return value;
+  }
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  return date.toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function groupByStage<T extends { stage: TStage }, TStage extends string>(

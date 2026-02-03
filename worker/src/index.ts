@@ -8,12 +8,15 @@ import {
   type CreateClientRequest,
   type CreateCoiRequest,
   type CreateEmailActivityRequest,
+  type DashboardReport,
   type EmailActivity,
+  type IncomeByMonthPoint,
   type PipelineSummary,
   type Referral,
   type StageChangeRequest,
   type UpdateClientRequest,
-  type UpdateCoiRequest
+  type UpdateCoiRequest,
+  type WeeklyReportBucket
 } from "@legal-leads/shared/types";
 
 export interface Env {
@@ -51,6 +54,10 @@ export default {
 
       if (request.method === "GET" && url.pathname === "/api/reports/summary") {
         return await getSummary(env.DB);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/reports/dashboard") {
+        return await getDashboardReport(env.DB, url);
       }
 
       if (request.method === "GET" && url.pathname === "/api/cois") {
@@ -228,6 +235,90 @@ async function getSummary(db: D1Database): Promise<Response> {
   };
 
   return json(payload);
+}
+
+async function getDashboardReport(db: D1Database, url: URL): Promise<Response> {
+  const monthParam = url.searchParams.get("month");
+  const month = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthKey();
+
+  const weeklySignedRows = await db
+    .prepare(
+      `SELECT
+        ((CAST(strftime('%d', substr(changed_at, 1, 10)) AS INTEGER) - 1) / 7) + 1 AS week_index,
+        COUNT(*) AS count
+      FROM stage_history
+      WHERE entity_type = 'COI'
+        AND to_stage = 'DOC_SIGNED'
+        AND substr(changed_at, 1, 7) = ?
+      GROUP BY week_index`
+    )
+    .bind(month)
+    .all<{ week_index: number; count: number }>();
+
+  const weeklyClientsRows = await db
+    .prepare(
+      `SELECT
+        ((CAST(strftime('%d', substr(created_at, 1, 10)) AS INTEGER) - 1) / 7) + 1 AS week_index,
+        COUNT(*) AS count
+      FROM clients
+      WHERE substr(created_at, 1, 7) = ?
+      GROUP BY week_index`
+    )
+    .bind(month)
+    .all<{ week_index: number; count: number }>();
+
+  const signedMap = new Map<number, number>(
+    (weeklySignedRows.results ?? []).map((row) => [Number(row.week_index), Number(row.count)])
+  );
+  const clientMap = new Map<number, number>(
+    (weeklyClientsRows.results ?? []).map((row) => [Number(row.week_index), Number(row.count)])
+  );
+
+  const weekly: WeeklyReportBucket[] = [1, 2, 3, 4, 5].map((week) => ({
+    weekLabel: `Week ${week}`,
+    spSignedCount: signedMap.get(week) ?? 0,
+    clientsAddedCount: clientMap.get(week) ?? 0
+  }));
+
+  const months = lastMonthKeys(6);
+  const incomeRows = await db
+    .prepare(
+      `SELECT
+        substr(expected_close_date, 1, 7) AS month,
+        CAST(ROUND(SUM(deal_size_cents * 0.06325), 0) AS INTEGER) AS expected_income_cents
+      FROM clients
+      WHERE expected_close_date IS NOT NULL
+        AND substr(expected_close_date, 1, 7) IN (${months.map(() => "?").join(",")})
+      GROUP BY month`
+    )
+    .bind(...months)
+    .all<{ month: string; expected_income_cents: number }>();
+
+  const incomeMap = new Map<string, number>(
+    (incomeRows.results ?? []).map((row) => [String(row.month), Number(row.expected_income_cents ?? 0)])
+  );
+  const incomeByMonth: IncomeByMonthPoint[] = months.map((entry) => ({
+    month: entry,
+    expectedIncomeCents: incomeMap.get(entry) ?? 0
+  }));
+
+  const payload: DashboardReport = { weekly, incomeByMonth };
+  return json(payload);
+}
+
+function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function lastMonthKeys(count: number): string[] {
+  const now = new Date();
+  const keys: string[] = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    keys.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  return keys;
 }
 
 async function listCois(db: D1Database, url: URL): Promise<Response> {

@@ -40,6 +40,7 @@ Stack:
 - `GET /api/health`
 - `GET /api/stages`
 - `GET /api/reports/summary`
+- `GET /api/reports/dashboard?month=YYYY-MM`
 - `GET/POST /api/cois`
 - `PATCH /api/cois/:id`
 - `POST /api/cois/:id/stage`

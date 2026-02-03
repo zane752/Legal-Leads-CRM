@@ -128,3 +128,19 @@ export interface CreateEmailActivityRequest {
   threadId?: string;
   snippet?: string;
 }
+
+export interface WeeklyReportBucket {
+  weekLabel: string;
+  spSignedCount: number;
+  clientsAddedCount: number;
+}
+
+export interface IncomeByMonthPoint {
+  month: string;
+  expectedIncomeCents: number;
+}
+
+export interface DashboardReport {
+  weekly: WeeklyReportBucket[];
+  incomeByMonth: IncomeByMonthPoint[];
+}

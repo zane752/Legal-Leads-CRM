@@ -22,6 +22,23 @@ body {
   margin-bottom: 1rem;
 }
 
+.tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  background: #ffffff;
+  border: 1px solid #cbd6e7;
+}
+
+.tab-active {
+  background: #17345f;
+  color: #ffffff;
+  border-color: #17345f;
+}
+
 .metrics {
   display: flex;
   flex-wrap: wrap;
@@ -81,6 +98,48 @@ button:disabled {
   margin-bottom: 1.2rem;
 }
 
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.report-card {
+  padding: 0.9rem;
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.7rem;
+  min-height: 190px;
+  padding-top: 1rem;
+}
+
+.chart-bar-wrap {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+}
+
+.chart-bar {
+  width: 100%;
+  max-width: 52px;
+  background: linear-gradient(180deg, #2f5f99 0%, #99b4de 100%);
+  border-radius: 8px 8px 4px 4px;
+}
+
+.chart-label {
+  font-size: 0.8rem;
+  color: #4a5568;
+}
+
+.chart-value {
+  font-size: 0.78rem;
+  color: #2a3f5f;
+}
+
 .lane {
   background: #f6f9ff;
   border: 1px solid #dce7fa;
@@ -117,4 +176,11 @@ button:disabled {
 .error {
   color: #b42318;
   font-weight: 600;
+}
+
+.pipeline-metric {
+  margin-top: -0.4rem;
+  margin-bottom: 0.8rem;
+  font-weight: 600;
+  color: #2a3f5f;
 }

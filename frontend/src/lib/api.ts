@@ -5,6 +5,7 @@ import type {
   CoiStage,
   CreateClientRequest,
   CreateCoiRequest,
+  DashboardReport,
   PipelineSummary,
   StageChangeRequest
 } from "@legal-leads/shared/types";
@@ -52,6 +53,11 @@ async function unwrap<T>(response: Response): Promise<T> {
 
 export async function getPipelineSummary(): Promise<PipelineSummary> {
   return unwrap<PipelineSummary>(await fetch(apiUrl("/api/reports/summary")));
+}
+
+export async function getDashboardReport(month?: string): Promise<DashboardReport> {
+  const query = month ? `?month=${encodeURIComponent(month)}` : "";
+  return unwrap<DashboardReport>(await fetch(apiUrl(`/api/reports/dashboard${query}`)));
 }
 
 export async function getCois(): Promise<Coi[]> {
