@@ -22,16 +22,30 @@ async function unwrap<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = `${response.status}`;
     try {
-      const payload = (await response.json()) as { error?: string };
-      if (payload.error) {
-        detail = payload.error;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const payload = (await response.json()) as { error?: string };
+        if (payload.error) {
+          detail = payload.error;
+        }
+      } else {
+        const text = (await response.text()).trim();
+        if (text.startsWith("<!doctype") || text.startsWith("<html")) {
+          detail = "API returned HTML instead of JSON. Set VITE_API_BASE_URL to your Worker URL and redeploy Pages.";
+        } else if (text) {
+          detail = text.slice(0, 180);
+        }
       }
     } catch {
       // no-op
     }
     throw new Error(detail);
   }
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error("API returned non-JSON response. Check VITE_API_BASE_URL and Worker deployment.");
+  }
 }
 
 export async function getPipelineSummary(): Promise<PipelineSummary> {
