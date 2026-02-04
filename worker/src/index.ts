@@ -224,8 +224,8 @@ async function getSummary(db: D1Database): Promise<Response> {
     .first<{ count: number }>();
 
   const openClientValue = await db
-    .prepare("SELECT COALESCE(SUM(deal_size_cents), 0) AS total FROM clients WHERE stage != ?")
-    .bind("PAID_CLOSED")
+    .prepare("SELECT COALESCE(SUM(deal_size_cents), 0) AS total FROM clients WHERE stage NOT IN (?, ?)")
+    .bind("CLOSED_PAID", "CLOSED_LOST")
     .first<{ total: number }>();
 
   const payload: PipelineSummary = {
@@ -248,7 +248,7 @@ async function getDashboardReport(db: D1Database, url: URL): Promise<Response> {
         COUNT(*) AS count
       FROM stage_history
       WHERE entity_type = 'COI'
-        AND to_stage = 'DOC_SIGNED'
+        AND to_stage = 'DOCS_SIGNED'
         AND substr(changed_at, 1, 7) = ?
       GROUP BY week_index`
     )
@@ -343,7 +343,7 @@ async function createCoi(db: D1Database, request: Request): Promise<Response> {
   assert(body.email?.trim(), "COI email is required");
 
   const id = crypto.randomUUID();
-  const stage: CoiStage = "NEW_CONTACT";
+  const stage: CoiStage = "INTRO_SCHEDULED";
   const timestamp = nowIso();
 
   await db
@@ -459,7 +459,7 @@ async function createClient(db: D1Database, request: Request): Promise<Response>
   assert(sourceCoi, "Referral COI not found");
 
   const id = crypto.randomUUID();
-  const stage: ClientStage = "NEW_CONTACT";
+  const stage: ClientStage = "REFERRED";
   const timestamp = nowIso();
 
   await db
@@ -505,9 +505,9 @@ async function updateClient(db: D1Database, id: string, request: Request): Promi
   assert(existing, "Client not found");
 
   const currentStage = String(existing.stage) as ClientStage;
-  if (["DOC_PROPOSAL", "FINALIZED", "INVOICE_PENDING", "PAID_CLOSED"].includes(currentStage)) {
+  if (["PROP_SENT_REVIEW", "CONTRACT_SENT", "WON_INVOICE_OPEN", "CLOSED_PAID"].includes(currentStage)) {
     const closeDate = body.expectedCloseDate ?? nullableString(existing.expected_close_date);
-    assert(closeDate, "expectedCloseDate is required once client reaches DOC_PROPOSAL or later");
+    assert(closeDate, "expectedCloseDate is required once client reaches Prop Sent/Review or later");
   }
 
   const timestamp = nowIso();
@@ -549,7 +549,7 @@ async function changeClientStage(db: D1Database, id: string, request: Request): 
     assert(body.reason?.trim(), "Reason is required for backward stage moves");
   }
 
-  if (["DOC_PROPOSAL", "FINALIZED", "INVOICE_PENDING", "PAID_CLOSED"].includes(toStage)) {
+  if (["PROP_SENT_REVIEW", "CONTRACT_SENT", "WON_INVOICE_OPEN", "CLOSED_PAID"].includes(toStage)) {
     assert(nullableString(existing.expected_close_date), "expectedCloseDate is required before this stage");
   }
 

@@ -734,6 +734,28 @@ function groupByStage<T extends { stage: TStage }, TStage extends string>(
 }
 
 function stageLabel(value: string): string {
+  const labels: Record<string, string> = {
+    INTRO_SCHEDULED: "Intro Scheduled",
+    NO_SHOW: "No Show",
+    RESCHEDULE: "Reschedule",
+    INTRO_COMPLETED: "Intro Completed",
+    ATTORNEY_SCHEDULED: "Attorney Scheduled",
+    ATTORNEY_COMPLETED: "Attorney Completed",
+    DOCS_SENT: "Docs Sent",
+    DOCS_SIGNED: "Docs Signed",
+    WON_REFERRING: "Won/Referring",
+    LOST: "Lost",
+    REFERRED: "Referred",
+    CONTACTED: "Contacted",
+    PROP_SENT_REVIEW: "Prop Sent/Review",
+    CONTRACT_SENT: "Contract Sent",
+    WON_INVOICE_OPEN: "Won/Invoice Open",
+    CLOSED_PAID: "Closed/ Paid",
+    CLOSED_LOST: "Closed/Lost"
+  };
+  if (labels[value]) {
+    return labels[value];
+  }
   return value
     .split("_")
     .map((word) => word[0] + word.slice(1).toLowerCase())
