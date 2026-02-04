@@ -158,7 +158,7 @@ export function App() {
         businessName: clientForm.businessName,
         expectedCloseDate: clientForm.expectedCloseDate || undefined,
         dealSizeCents: Math.round((Number(clientForm.dealSizeDollars) || 0) * 100),
-        coiId: clientForm.coiId
+        coiId: clientForm.coiId || undefined
       });
       setClientForm(emptyClientForm);
       await refreshData();
@@ -415,13 +415,12 @@ export function App() {
         <>
           <section className="forms">
             <form className="card form" onSubmit={onCreateClient}>
-              <h2>New Client (from SP)</h2>
+              <h2>New Client</h2>
               <select
-                required
                 value={clientForm.coiId}
                 onChange={(event) => setClientForm((v) => ({ ...v, coiId: event.target.value }))}
               >
-                <option value="">Select referral SP</option>
+                <option value="">No SP (Inbound Lead)</option>
                 {cois.map((coi) => (
                   <option key={coi.id} value={coi.id}>
                     {coi.name} ({coi.businessName || "No business"})

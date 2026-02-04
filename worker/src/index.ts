@@ -453,10 +453,11 @@ async function createClient(db: D1Database, request: Request): Promise<Response>
   const body = await readJson<CreateClientRequest>(request);
   assert(body.name?.trim(), "Client name is required");
   assert(body.email?.trim(), "Client email is required");
-  assert(body.coiId?.trim(), "coiId is required");
-
-  const sourceCoi = await db.prepare("SELECT id FROM cois WHERE id = ?").bind(body.coiId).first();
-  assert(sourceCoi, "Referral COI not found");
+  const referralCoiId = body.coiId?.trim() || null;
+  if (referralCoiId) {
+    const sourceCoi = await db.prepare("SELECT id FROM cois WHERE id = ?").bind(referralCoiId).first();
+    assert(sourceCoi, "Referral SP not found");
+  }
 
   const id = crypto.randomUUID();
   const stage: ClientStage = "REFERRED";
@@ -481,18 +482,20 @@ async function createClient(db: D1Database, request: Request): Promise<Response>
     )
     .run();
 
-  await db
-    .prepare(
-      "INSERT INTO referrals (id, coi_id, client_id, referred_at, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)"
-    )
-    .bind(crypto.randomUUID(), body.coiId, id, timestamp, timestamp, timestamp)
-    .run();
+  if (referralCoiId) {
+    await db
+      .prepare(
+        "INSERT INTO referrals (id, coi_id, client_id, referred_at, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?)"
+      )
+      .bind(crypto.randomUUID(), referralCoiId, id, timestamp, timestamp, timestamp)
+      .run();
+  }
 
   await db
     .prepare(
       "INSERT INTO stage_history (id, entity_type, entity_id, from_stage, to_stage, reason, changed_at) VALUES (?, 'CLIENT', ?, NULL, ?, ?, ?)"
     )
-    .bind(crypto.randomUUID(), id, stage, "Created from referral", timestamp)
+    .bind(crypto.randomUUID(), id, stage, referralCoiId ? "Created from referral" : "Created inbound (No SP)", timestamp)
     .run();
 
   const row = await db.prepare("SELECT * FROM clients WHERE id = ?").bind(id).first<Record<string, unknown>>();

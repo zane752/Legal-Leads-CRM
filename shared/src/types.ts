@@ -100,7 +100,7 @@ export interface CreateClientRequest {
   notes?: string;
   dealSizeCents?: number;
   expectedCloseDate?: string;
-  coiId: string;
+  coiId?: string;
 }
 
 export interface UpdateClientRequest {
