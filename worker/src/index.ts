@@ -285,7 +285,7 @@ async function getDashboardReport(db: D1Database, url: URL): Promise<Response> {
     .prepare(
       `SELECT
         substr(expected_close_date, 1, 7) AS month,
-        CAST(ROUND(SUM(deal_size_cents * 0.06325), 0) AS INTEGER) AS expected_income_cents
+        CAST(ROUND(SUM(deal_size_cents * 0.01265), 0) AS INTEGER) AS expected_income_cents
       FROM clients
       WHERE expected_close_date IS NOT NULL
         AND substr(expected_close_date, 1, 7) IN (${months.map(() => "?").join(",")})

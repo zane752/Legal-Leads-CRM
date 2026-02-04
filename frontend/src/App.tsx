@@ -329,7 +329,7 @@ export function App() {
       {activeTab === "dashboard" && (
         <section>
           <h2>Expected Income by Month</h2>
-          <p className="pipeline-metric">Income estimate uses 6.325% of each client deal size.</p>
+          <p className="pipeline-metric">Income estimate uses 1.265% of each client deal size.</p>
           <BarChart
             labels={dashboardReport?.incomeByMonth.map((entry) => monthLabel(entry.month)) ?? []}
             values={dashboardReport?.incomeByMonth.map((entry) => entry.expectedIncomeCents / 100) ?? []}
