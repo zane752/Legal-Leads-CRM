@@ -68,6 +68,7 @@ export function App() {
   const [coiForm, setCoiForm] = useState<CoiForm>(emptyCoiForm);
   const [clientForm, setClientForm] = useState<ClientForm>(emptyClientForm);
   const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
+  const [dragState, setDragState] = useState<{ entity: "sp" | "client"; id: string } | null>(null);
   const [selectedSpId, setSelectedSpId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<EmailActivity[]>([]);
@@ -189,6 +190,34 @@ export function App() {
     }
   }
 
+  async function moveSpToStage(item: Coi, targetStage: Coi["stage"]) {
+    const start = COI_STAGES.indexOf(item.stage);
+    const end = COI_STAGES.indexOf(targetStage);
+    if (start === -1 || end === -1 || start === end) {
+      return;
+    }
+
+    const direction = end > start ? 1 : -1;
+    const reason =
+      direction < 0 ? window.prompt("Reason for moving backward?") || undefined : undefined;
+    if (direction < 0 && !reason) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      for (let index = start + direction; direction > 0 ? index <= end : index >= end; index += direction) {
+        await moveCoiStage(item.id, COI_STAGES[index], reason);
+      }
+      await refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to move stage");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function moveClient(item: Client, dir: "prev" | "next") {
     const idx = CLIENT_STAGES.indexOf(item.stage);
     const nextIdx = dir === "next" ? idx + 1 : idx - 1;
@@ -201,6 +230,34 @@ export function App() {
     setError(null);
     try {
       await moveClientStage(item.id, toStage, reason);
+      await refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to move stage");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function moveClientToStage(item: Client, targetStage: Client["stage"]) {
+    const start = CLIENT_STAGES.indexOf(item.stage);
+    const end = CLIENT_STAGES.indexOf(targetStage);
+    if (start === -1 || end === -1 || start === end) {
+      return;
+    }
+
+    const direction = end > start ? 1 : -1;
+    const reason =
+      direction < 0 ? window.prompt("Reason for moving backward?") || undefined : undefined;
+    if (direction < 0 && !reason) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      for (let index = start + direction; direction > 0 ? index <= end : index >= end; index += direction) {
+        await moveClientStage(item.id, CLIENT_STAGES[index], reason);
+      }
       await refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to move stage");
@@ -376,10 +433,35 @@ export function App() {
             <h2>Pipeline 1: SPs</h2>
             <div className="board">
               {COI_STAGES.map((stage) => (
-                <div key={stage} className="lane">
+                <div
+                  key={stage}
+                  className="lane"
+                  onDragOver={(event) => {
+                    if (dragState?.entity === "sp") {
+                      event.preventDefault();
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (dragState?.entity !== "sp") {
+                      return;
+                    }
+                    const item = cois.find((row) => row.id === dragState.id);
+                    setDragState(null);
+                    if (item) {
+                      void moveSpToStage(item, stage);
+                    }
+                  }}
+                >
                   <h3>{stageLabel(stage)}</h3>
                   {coisByStage[stage].map((coi) => (
-                    <article className="item" key={coi.id}>
+                    <article
+                      className="item"
+                      key={coi.id}
+                      draggable
+                      onDragStart={() => setDragState({ entity: "sp", id: coi.id })}
+                      onDragEnd={() => setDragState(null)}
+                    >
                       <strong>{coi.name}</strong>
                       <span>{coi.businessName || "No business"}</span>
                       <span>{coi.email}</span>
@@ -477,10 +559,35 @@ export function App() {
             )}
             <div className="board">
               {CLIENT_STAGES.map((stage) => (
-                <div key={stage} className="lane">
+                <div
+                  key={stage}
+                  className="lane"
+                  onDragOver={(event) => {
+                    if (dragState?.entity === "client") {
+                      event.preventDefault();
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (dragState?.entity !== "client") {
+                      return;
+                    }
+                    const item = clients.find((row) => row.id === dragState.id);
+                    setDragState(null);
+                    if (item) {
+                      void moveClientToStage(item, stage);
+                    }
+                  }}
+                >
                   <h3>{stageLabel(stage)}</h3>
                   {clientsByStage[stage].map((client) => (
-                    <article className="item" key={client.id}>
+                    <article
+                      className="item"
+                      key={client.id}
+                      draggable
+                      onDragStart={() => setDragState({ entity: "client", id: client.id })}
+                      onDragEnd={() => setDragState(null)}
+                    >
                       <strong>{client.name}</strong>
                       <span>{client.businessName || "No business"}</span>
                       <span>{client.email}</span>
