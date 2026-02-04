@@ -728,7 +728,9 @@ function groupByStage<T extends { stage: TStage }, TStage extends string>(
 ): Record<TStage, T[]> {
   const seeded = Object.fromEntries(stages.map((stage) => [stage, [] as T[]])) as Record<TStage, T[]>;
   for (const row of rows) {
-    seeded[row.stage].push(row);
+    if (seeded[row.stage]) {
+      seeded[row.stage].push(row);
+    }
   }
   return seeded;
 }
