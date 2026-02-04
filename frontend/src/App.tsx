@@ -420,7 +420,7 @@ export function App() {
                 value={clientForm.coiId}
                 onChange={(event) => setClientForm((v) => ({ ...v, coiId: event.target.value }))}
               >
-                <option value="">No SP (Inbound Lead)</option>
+                <option value="">No SP</option>
                 {cois.map((coi) => (
                   <option key={coi.id} value={coi.id}>
                     {coi.name} ({coi.businessName || "No business"})

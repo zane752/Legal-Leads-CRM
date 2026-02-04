@@ -495,7 +495,7 @@ async function createClient(db: D1Database, request: Request): Promise<Response>
     .prepare(
       "INSERT INTO stage_history (id, entity_type, entity_id, from_stage, to_stage, reason, changed_at) VALUES (?, 'CLIENT', ?, NULL, ?, ?, ?)"
     )
-    .bind(crypto.randomUUID(), id, stage, referralCoiId ? "Created from referral" : "Created inbound (No SP)", timestamp)
+    .bind(crypto.randomUUID(), id, stage, referralCoiId ? "Created from referral" : "Created with no SP", timestamp)
     .run();
 
   const row = await db.prepare("SELECT * FROM clients WHERE id = ?").bind(id).first<Record<string, unknown>>();
