@@ -135,6 +135,13 @@ button:disabled {
   font-weight: 600;
 }
 
+.inline-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .chart {
   display: flex;
   align-items: flex-end;
@@ -212,6 +219,35 @@ button:disabled {
 .item span {
   font-size: 0.85rem;
   color: #4a5568;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.tag-green {
+  background: #e6f6ed;
+  color: #0f6d3e;
+  border: 1px solid #9ad8b7;
+}
+
+.tag-yellow {
+  background: #fff7d1;
+  color: #7a5200;
+  border: 1px solid #f2d27a;
+}
+
+.tag-red {
+  background: #ffe3e3;
+  color: #9a1b1b;
+  border: 1px solid #f1a2a2;
 }
 
 .actions {

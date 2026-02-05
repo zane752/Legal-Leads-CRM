@@ -78,6 +78,7 @@ export function App() {
     snippet: "",
     sentAt: toLocalDatetimeValue(new Date())
   });
+  const [legacyCloseDate, setLegacyCloseDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -89,6 +90,14 @@ export function App() {
 
   const coisByStage = useMemo(() => groupByStage(cois, COI_STAGES), [cois]);
   const clientsByStage = useMemo(() => groupByStage(clients, CLIENT_STAGES), [clients]);
+  const legacyClientsNeedingCloseDate = useMemo(
+    () =>
+      [...clients]
+        .filter((client) => !client.expectedCloseDate)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    [clients]
+  );
+  const nextLegacyClient = legacyClientsNeedingCloseDate[0] ?? null;
 
   useEffect(() => {
     void refreshData();
@@ -152,12 +161,15 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
+      if (!clientForm.expectedCloseDate) {
+        throw new Error("Expected close date is required for clients.");
+      }
       await createClient({
         name: clientForm.name,
         email: clientForm.email,
         phone: clientForm.phone,
         businessName: clientForm.businessName,
-        expectedCloseDate: clientForm.expectedCloseDate || undefined,
+        expectedCloseDate: clientForm.expectedCloseDate,
         dealSizeCents: Math.round((Number(clientForm.dealSizeDollars) || 0) * 100),
         coiId: clientForm.coiId || undefined
       });
@@ -165,6 +177,24 @@ export function App() {
       await refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create Client");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveLegacyExpectedCloseDate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!nextLegacyClient || !legacyCloseDate) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await updateClientDetails(nextLegacyClient.id, { expectedCloseDate: legacyCloseDate });
+      setLegacyCloseDate("");
+      await refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save expected close date");
     } finally {
       setBusy(false);
     }
@@ -383,6 +413,27 @@ export function App() {
 
       {error && <p className="error">{error}</p>}
 
+      {nextLegacyClient && (
+        <section className="card form">
+          <h2>Legacy Client Timeline Needed</h2>
+          <p>
+            Please add expected close dates in chronological order. Next:{" "}
+            <strong>{nextLegacyClient.name}</strong> (added {new Date(nextLegacyClient.createdAt).toLocaleDateString()}).
+          </p>
+          <form className="inline-form" onSubmit={saveLegacyExpectedCloseDate}>
+            <input
+              required
+              type="date"
+              value={legacyCloseDate}
+              onChange={(event) => setLegacyCloseDate(event.target.value)}
+            />
+            <button disabled={busy} type="submit">
+              Save Expected Close Date
+            </button>
+          </form>
+        </section>
+      )}
+
       {activeTab === "dashboard" && (
         <section>
           <h2>Expected Income by Month</h2>
@@ -462,6 +513,7 @@ export function App() {
                       onDragStart={() => setDragState({ entity: "sp", id: coi.id })}
                       onDragEnd={() => setDragState(null)}
                     >
+                      <span className={`tag ${getSpContactTagClass(coi)}`}>{getSpContactTagLabel(coi)}</span>
                       <strong>{coi.name}</strong>
                       <span>{coi.businessName || "No business"}</span>
                       <span>{coi.email}</span>
@@ -543,6 +595,7 @@ export function App() {
               <input
                 placeholder="Expected Close Date"
                 type="date"
+                required
                 value={clientForm.expectedCloseDate}
                 onChange={(event) => setClientForm((v) => ({ ...v, expectedCloseDate: event.target.value }))}
               />
@@ -588,6 +641,7 @@ export function App() {
                       onDragStart={() => setDragState({ entity: "client", id: client.id })}
                       onDragEnd={() => setDragState(null)}
                     >
+                      <span className={`tag ${getClientContactTagClass(client)}`}>{getClientContactTagLabel(client)}</span>
                       <strong>{client.name}</strong>
                       <span>{client.businessName || "No business"}</span>
                       <span>{client.email}</span>
@@ -873,4 +927,51 @@ function stageLabel(value: string): string {
 function toLocalDatetimeValue(date: Date): string {
   const pad = (v: number) => String(v).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function daysSince(isoDate: string | null): number {
+  if (!isoDate) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const date = new Date(isoDate);
+  const diffMs = Date.now() - date.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function getClientContactTagClass(client: Client): string {
+  if (client.stage === "WON_INVOICE_OPEN" || client.stage === "CLOSED_PAID") {
+    return "tag-green";
+  }
+  const age = daysSince(client.lastContactAt);
+  if (age <= 7) return "tag-green";
+  if (age <= 30) return "tag-yellow";
+  return "tag-red";
+}
+
+function getClientContactTagLabel(client: Client): string {
+  if (client.stage === "WON_INVOICE_OPEN" || client.stage === "CLOSED_PAID") {
+    return "Won";
+  }
+  const age = daysSince(client.lastContactAt);
+  if (!Number.isFinite(age)) return "No Contact";
+  return `${age}d`;
+}
+
+function getSpContactTagClass(sp: Coi): string {
+  if (sp.stage === "WON_REFERRING") {
+    return "tag-green";
+  }
+  const age = daysSince(sp.lastContactAt);
+  if (age <= 60) return "tag-green";
+  if (age <= 90) return "tag-yellow";
+  return "tag-red";
+}
+
+function getSpContactTagLabel(sp: Coi): string {
+  if (sp.stage === "WON_REFERRING") {
+    return "Referring";
+  }
+  const age = daysSince(sp.lastContactAt);
+  if (!Number.isFinite(age)) return "No Contact";
+  return `${age}d`;
 }
